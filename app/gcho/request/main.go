@@ -3,14 +3,25 @@ package request
 import (
 	"bufio"
 	"fmt"
+	"slices"
 	"strings"
-
-	"github.com/codecrafters-io/http-server-starter-go/app/http"
 )
+
+const (
+	HTTPV1 = "HTTP/1.1"
+)
+
+func versions() []string {
+	return []string{HTTPV1}
+}
+
+func checkVersion(v string) (ok bool) {
+	return slices.Contains(versions(), v)
+}
 
 type Request struct {
 	Path    string
-	Method  http.Method
+	Method  string
 	Version string
 }
 
@@ -24,13 +35,13 @@ func Parse(r *bufio.Reader) (req Request, err error) {
 	if len(reqInfo) != 3 {
 		return Request{}, fmt.Errorf("inavalid request structure found")
 	}
-	if !http.CheckMethod(reqInfo[0]) {
+	if !checkMethod(reqInfo[0]) {
 		return Request{}, fmt.Errorf("invalid method detected")
 	}
-	if !http.CheckVersion(reqInfo[2]) {
+	if !checkVersion(reqInfo[2]) {
 		return Request{}, fmt.Errorf("unsupported http version found")
 	}
-	req.Method = http.Method(reqInfo[0])
+	req.Method = reqInfo[0]
 	req.Path = reqInfo[1]
 	req.Version = reqInfo[2]
 	// for {

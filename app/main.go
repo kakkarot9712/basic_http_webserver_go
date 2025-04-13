@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
-	"github.com/codecrafters-io/http-server-starter-go/app/http/request"
+	"github.com/codecrafters-io/http-server-starter-go/app/gcho"
 )
 
 func main() {
@@ -24,21 +23,22 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	buf := bufio.NewReader(conn)
-
-	req, err := request.Parse(buf)
+	ctx, err := gcho.NewContext(conn)
 	if err != nil {
 		panic(err)
 	}
 
+	req := ctx.Request
 	switch {
 	case req.Path == "/":
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		ctx.Write(200, nil)
+		// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	case strings.HasPrefix(req.Path, "/echo"):
 		echoStr := strings.TrimPrefix(req.Path, "/echo/")
-		res := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %v\r\n\r\n%v", len(echoStr), echoStr)
-		conn.Write([]byte(res))
+		ctx.Write(200, []byte(echoStr))
+		// res := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %v\r\n\r\n%v", len(echoStr), echoStr)
+		// conn.Write([]byte(res))
 	default:
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		ctx.Write(404, nil)
 	}
 }
