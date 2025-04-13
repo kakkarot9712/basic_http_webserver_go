@@ -32,12 +32,11 @@ func main() {
 	switch {
 	case req.Path == "/":
 		ctx.Write(200, nil)
-		// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	case strings.HasPrefix(req.Path, "/echo"):
 		echoStr := strings.TrimPrefix(req.Path, "/echo/")
 		ctx.Write(200, []byte(echoStr))
-		// res := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %v\r\n\r\n%v", len(echoStr), echoStr)
-		// conn.Write([]byte(res))
+	case req.Path == "/user-agent":
+		ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
 	default:
 		ctx.Write(404, nil)
 	}
