@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/codecrafters-io/http-server-starter-go/app/http/request"
 )
 
 func main() {
@@ -20,5 +23,17 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	buf := bufio.NewReader(conn)
+
+	req, err := request.Parse(buf)
+	if err != nil {
+		panic(err)
+	}
+
+	switch req.Path {
+	case "/":
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	default:
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	}
 }
