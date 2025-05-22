@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/codecrafters-io/http-server-starter-go/app/gcho"
+	"github.com/codecrafters-io/http-server-starter-go/app/gcho/compressor"
 )
 
 type Task struct {
@@ -63,6 +64,10 @@ func (h *Hub) Start() {
 					ctx.Write(200, nil)
 				case strings.HasPrefix(req.Path, "/echo"):
 					echoStr := strings.TrimPrefix(req.Path, "/echo/")
+					acceptedEncodings := compressor.ParseAcceptEncoders(req)
+					if len(acceptedEncodings) > 0 {
+						ctx.Headers().Set("Content-Encoding", acceptedEncodings[0])
+					}
 					ctx.Write(200, []byte(echoStr))
 				case req.Path == "/user-agent":
 					ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
