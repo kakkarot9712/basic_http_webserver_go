@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	// Uncomment this block to pass the first stage
-	//
 	h := hub.NewHub(10)
 	h.Start()
 	l, err := net.Listen("tcp", "0.0.0.0:4221")

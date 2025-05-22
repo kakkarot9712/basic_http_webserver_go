@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/codecrafters-io/http-server-starter-go/app/gcho/headers"
 	"github.com/codecrafters-io/http-server-starter-go/app/gcho/request"
 	"github.com/codecrafters-io/http-server-starter-go/app/gcho/response"
 )
@@ -58,4 +59,8 @@ func (ctx *Context) Write(status int, p []byte) error {
 	}
 	ctx.conn.Write(buf.Bytes())
 	return nil
+}
+
+func (ctx *Context) Headers() headers.Headers {
+	return ctx.res.Headers
 }

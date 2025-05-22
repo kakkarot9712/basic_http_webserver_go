@@ -1,7 +1,10 @@
 package hub
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"slices"
 	"strings"
 	"sync"
 
@@ -31,11 +34,24 @@ func NewHub(wsize uint) *Hub {
 func (h *Hub) Start() {
 	// create workers
 	var wg sync.WaitGroup
+	dirArgIndex := slices.Index(os.Args, "--directory")
+	var staticDirPath string
+	if dirArgIndex != -1 {
+		if len(os.Args) < dirArgIndex+1 {
+			panic("directory location is required!")
+		}
+		staticDirPath = os.Args[dirArgIndex+1]
+	}
 
 	for range h.workersLimit {
 		wg.Add(1)
 		go func() {
-			for task := range h.workChann {
+			select {
+			case task, ok := <-h.workChann:
+				if !ok {
+					wg.Done()
+					return
+				}
 				ctx, err := gcho.NewContext(task.C)
 				if err != nil {
 					panic(err)
@@ -49,6 +65,15 @@ func (h *Hub) Start() {
 					ctx.Write(200, []byte(echoStr))
 				case req.Path == "/user-agent":
 					ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
+				case strings.HasPrefix(req.Path, "/files"):
+					fileName := strings.TrimPrefix(req.Path, "/files/")
+					buff, err := os.ReadFile(fmt.Sprintf("%s/%s", staticDirPath, fileName))
+					if err != nil {
+						ctx.Write(404, nil)
+					}
+					ctx.Headers().Set("Content-Type", "application/octet-stream")
+					ctx.Headers().Set("Content-Length", fmt.Sprintf("%v", len(buff)))
+					ctx.Write(200, buff)
 				default:
 					ctx.Write(404, nil)
 				}
