@@ -48,66 +48,67 @@ func (h *Hub) Start() {
 	for range h.workersLimit {
 		wg.Add(1)
 		go func() {
-			select {
-			case task, ok := <-h.workChann:
-				if !ok {
-					wg.Done()
-					return
+			task, ok := <-h.workChann
+			if !ok {
+				wg.Done()
+				return
+			}
+			ctx, err := gcho.NewContext(task.C)
+			if err != nil {
+				panic(err)
+			}
+			req := ctx.Request
+			switch {
+			case req.Path == "/":
+				ctx.Write(200, nil)
+			case strings.HasPrefix(req.Path, "/echo"):
+				echoStr := strings.TrimPrefix(req.Path, "/echo/")
+				acceptedEncodings := compressor.ParseAcceptEncoders(req)
+				var body []byte
+				if len(acceptedEncodings) > 0 {
+					ctx.Headers().Set("Content-Encoding", acceptedEncodings[0])
+					body = compressor.Compress(acceptedEncodings[0], []byte(echoStr))
+				} else {
+					body = []byte(echoStr)
 				}
-				ctx, err := gcho.NewContext(task.C)
-				if err != nil {
-					panic(err)
-				}
-				req := ctx.Request
-				switch {
-				case req.Path == "/":
-					ctx.Write(200, nil)
-				case strings.HasPrefix(req.Path, "/echo"):
-					echoStr := strings.TrimPrefix(req.Path, "/echo/")
-					acceptedEncodings := compressor.ParseAcceptEncoders(req)
-					if len(acceptedEncodings) > 0 {
-						ctx.Headers().Set("Content-Encoding", acceptedEncodings[0])
-					}
-					ctx.Write(200, []byte(echoStr))
-				case req.Path == "/user-agent":
-					ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
-				case strings.HasPrefix(req.Path, "/files"):
-					if req.Method == "GET" {
-						fileName := strings.TrimPrefix(req.Path, "/files/")
-						buff, err := os.ReadFile(fmt.Sprintf("%s/%s", staticDirPath, fileName))
-						if err != nil {
-							ctx.Write(404, nil)
-						}
-						ctx.Headers().Set("Content-Type", "application/octet-stream")
-						ctx.Headers().Set("Content-Length", fmt.Sprintf("%v", len(buff)))
-						ctx.Write(200, buff)
-					} else if req.Method == "POST" {
-						fileName := strings.TrimPrefix(req.Path, "/files/")
-						if req.Headers.Get("Content-Type") == "application/octet-stream" {
-							bodySizeStr := req.Headers.Get("Content-Length")
-							if bodySize, err := strconv.ParseUint(bodySizeStr, 10, 64); err == nil {
-								if len(req.Body) != int(bodySize) {
-									ctx.Write(400, nil)
-								}
-								file, err := os.Create(fmt.Sprintf("%s/%s", staticDirPath, fileName))
-								if err != nil {
-									ctx.Write(500, nil)
-								}
-								file.Write(req.Body)
-								file.Sync() // Propagate changes to the disk from page cache
-								ctx.Write(201, nil)
-							} else {
-								fmt.Println(err)
-								ctx.Write(400, nil)
-							}
-						}
-					} else {
+				ctx.Write(200, body)
+			case req.Path == "/user-agent":
+				ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
+			case strings.HasPrefix(req.Path, "/files"):
+				if req.Method == "GET" {
+					fileName := strings.TrimPrefix(req.Path, "/files/")
+					buff, err := os.ReadFile(fmt.Sprintf("%s/%s", staticDirPath, fileName))
+					if err != nil {
 						ctx.Write(404, nil)
 					}
-
-				default:
+					ctx.Headers().Set("Content-Type", "application/octet-stream")
+					ctx.Write(200, buff)
+				} else if req.Method == "POST" {
+					fileName := strings.TrimPrefix(req.Path, "/files/")
+					if req.Headers.Get("Content-Type") == "application/octet-stream" {
+						bodySizeStr := req.Headers.Get("Content-Length")
+						if bodySize, err := strconv.ParseUint(bodySizeStr, 10, 64); err == nil {
+							if len(req.Body) != int(bodySize) {
+								ctx.Write(400, nil)
+							}
+							file, err := os.Create(fmt.Sprintf("%s/%s", staticDirPath, fileName))
+							if err != nil {
+								ctx.Write(500, nil)
+							}
+							file.Write(req.Body)
+							file.Sync() // Propagate changes to the disk from page cache
+							ctx.Write(201, nil)
+						} else {
+							fmt.Println(err)
+							ctx.Write(400, nil)
+						}
+					}
+				} else {
 					ctx.Write(404, nil)
 				}
+
+			default:
+				ctx.Write(404, nil)
 			}
 		}()
 	}
