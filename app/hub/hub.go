@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -66,14 +67,39 @@ func (h *Hub) Start() {
 				case req.Path == "/user-agent":
 					ctx.Write(200, []byte(ctx.Request.Headers.Get("User-Agent")))
 				case strings.HasPrefix(req.Path, "/files"):
-					fileName := strings.TrimPrefix(req.Path, "/files/")
-					buff, err := os.ReadFile(fmt.Sprintf("%s/%s", staticDirPath, fileName))
-					if err != nil {
+					if req.Method == "GET" {
+						fileName := strings.TrimPrefix(req.Path, "/files/")
+						buff, err := os.ReadFile(fmt.Sprintf("%s/%s", staticDirPath, fileName))
+						if err != nil {
+							ctx.Write(404, nil)
+						}
+						ctx.Headers().Set("Content-Type", "application/octet-stream")
+						ctx.Headers().Set("Content-Length", fmt.Sprintf("%v", len(buff)))
+						ctx.Write(200, buff)
+					} else if req.Method == "POST" {
+						fileName := strings.TrimPrefix(req.Path, "/files/")
+						if req.Headers.Get("Content-Type") == "application/octet-stream" {
+							bodySizeStr := req.Headers.Get("Content-Length")
+							if bodySize, err := strconv.ParseUint(bodySizeStr, 10, 64); err == nil {
+								if len(req.Body) != int(bodySize) {
+									ctx.Write(400, nil)
+								}
+								file, err := os.Create(fmt.Sprintf("%s/%s", staticDirPath, fileName))
+								if err != nil {
+									ctx.Write(500, nil)
+								}
+								file.Write(req.Body)
+								file.Sync() // Propagate changes to the disk from page cache
+								ctx.Write(201, nil)
+							} else {
+								fmt.Println(err)
+								ctx.Write(400, nil)
+							}
+						}
+					} else {
 						ctx.Write(404, nil)
 					}
-					ctx.Headers().Set("Content-Type", "application/octet-stream")
-					ctx.Headers().Set("Content-Length", fmt.Sprintf("%v", len(buff)))
-					ctx.Write(200, buff)
+
 				default:
 					ctx.Write(404, nil)
 				}

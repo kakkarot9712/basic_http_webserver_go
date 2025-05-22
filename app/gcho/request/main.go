@@ -25,6 +25,7 @@ type Request struct {
 	Path    string
 	Method  string
 	Version string
+	Body    []byte
 	Headers headers.Headers
 }
 
@@ -63,5 +64,8 @@ func Parse(r *bufio.Reader) (req Request, err error) {
 		}
 		req.Headers.Set(header[:splitIndex], header[splitIndex+2:])
 	}
+	remainingLength := r.Buffered()
+	req.Body = make([]byte, remainingLength)
+	r.Read(req.Body)
 	return req, nil
 }
